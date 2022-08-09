@@ -1,40 +1,26 @@
 package com.cheese.weatherapp.ui
+
 import android.os.Bundle
-import android.util.Log
 import android.view.LayoutInflater
-import android.widget.Toast
+import android.view.View
 import androidx.appcompat.app.AppCompatActivity
 import androidx.viewbinding.ViewBinding
 
-abstract class BaseActivity<VB :ViewBinding> :AppCompatActivity() {
-    abstract val  LOG_TAG:String
-
-    abstract val bindingInflater : (LayoutInflater) -> VB
-    private var _binding : ViewBinding? = null
-
-     val binding  get() = _binding as VB
+abstract class BaseActivity<VB: ViewBinding>(private val invokeMethod: (LayoutInflater) -> VB) : AppCompatActivity() {
+    private var _binding : VB? = null
+    protected val binding: VB get() = _binding!!
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        _binding =bindingInflater(layoutInflater)
-        setContentView(requireNotNull(_binding).root)
-
-        setUp()
-        addCallbacks()
+        _binding = invokeMethod.invoke(layoutInflater)
+        setUpOnCreateView()
+        setContentView(binding.root)
     }
 
-    abstract fun setUp()
-    abstract fun addCallbacks()
-    protected fun log(value:Any){
-        Log.v(LOG_TAG,value.toString())
-    }
+    abstract fun setUpOnCreateView()
 
-    protected fun showToast(message:String){
-        Toast.makeText(
-            this,
-            message,
-            Toast.LENGTH_SHORT
-        ).show()
+    override fun onDestroy() {
+        super.onDestroy()
+        _binding = null
     }
-
 }

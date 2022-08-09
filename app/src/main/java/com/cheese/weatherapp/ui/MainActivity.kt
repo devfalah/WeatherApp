@@ -1,103 +1,57 @@
 package com.cheese.weatherapp.ui
-import android.view.LayoutInflater
-import androidx.core.widget.doOnTextChanged
-import com.cheese.weatherapp.R
-import com.cheese.weatherapp.databinding.ActivityMainBinding
-import com.cheese.weatherapp.data.models.WeatherState
+
+import android.util.Log
+import com.cheese.weatherapp.data.models.CurrentWeather
+import com.cheese.weatherapp.data.models.WeatherResponse
 import com.cheese.weatherapp.data.request.ApiClient
-import com.example.mikmok.data.models.WeatherMain
-import com.example.mikmok.util.Constants
-import com.example.mikmok.util.toCelsius
-import com.example.mikmok.util.toPercent
+import com.cheese.weatherapp.databinding.ActivityMainBinding
+import com.cheese.weatherapp.util.Constants
+import com.cheese.weatherapp.util.getCurrentWeatherFromWeatherResponse
 import com.google.gson.Gson
-import io.reactivex.rxjava3.core.Observable
-import okhttp3.*
+import okhttp3.Call
+import okhttp3.Callback
+import okhttp3.Response
 import java.io.IOException
-import java.util.concurrent.TimeUnit
 
-class MainActivity : BaseActivity<ActivityMainBinding>(){
-    var cityName:String =Constants.CITY
-    val gson =Gson()
-    private val apiClient by lazy { ApiClient() }
-    override val LOG_TAG: String =Constants.MAIN_ACTIVITY
-    override val bindingInflater: (LayoutInflater) -> ActivityMainBinding = ActivityMainBinding::inflate
+class MainActivity : BaseActivity<ActivityMainBinding>(ActivityMainBinding::inflate){
+    private val logTag: String = Constants.MALT
 
-    override fun setUp() {
-      getWeather(cityName=cityName)
-    }
-    override fun addCallbacks() {
-         onSearchChange()
+    override fun setUpOnCreateView() {
+        getForecast("Baghdad", 12, 7)
     }
 
-
-    private fun onSearchChange(){
-        val observableSearch =Observable.create<String>{ emitter->
-            binding.searchCity.doOnTextChanged { text, start, before, count ->
-                if (count !=Constants.INDEXT_COUNT_EMPTY) {
-                    emitter.onNext(text.toString())
-                }
-            }
-        }.debounce(Constants.TIME.toLong(),TimeUnit.SECONDS)
-        observableSearch.subscribe(
-            {cityName->getWeather(cityName=cityName)},
-            {notFound-> showToast(message = Constants.CITY_NOT_FOUND)
-            }
-        )
+    private fun setUpCurrentWeather(currentWeather: CurrentWeather) {
+        binding.run {
+            cityName.text = currentWeather.location
+            temp.text = currentWeather.temperature
+            description.text = currentWeather.weatherStatus
+            maxMin.text = ""
+            valuePressure.text = currentWeather.pressure
+            valueClouds.text = currentWeather.cloud
+            valueWind.text = currentWeather.windSpeed
+            valueHumidity.text = currentWeather.humidity
+        }
     }
 
-
-    private fun getWeather(cityName:String) {
-        apiClient.makeApiRequest(cityName=cityName.trim()).enqueue(object : Callback {
+    private fun getForecast(
+        location: String,
+        time: Int,
+        daysCount: Int
+    ) {
+        ApiClient().makeApiRequest(location, time, daysCount).enqueue(object : Callback {
             override fun onFailure(call: Call, e: IOException) {
-               showToast("${Constants.ON_FAILURE} ${e.message}")
+                Log.d(logTag, "Failed to grab data due to: ${e.message.toString()}")
             }
+
             override fun onResponse(call: Call, response: Response) {
-                response.body?.string()?.let { jsonString ->
-                    val result = gson.fromJson(jsonString, WeatherMain::class.java)
-
+                Log.d(logTag, "Success!")
+                response.body?.string()?.let {
+                    val weatherResponse = Gson().fromJson(it, WeatherResponse::class.java)
                     runOnUiThread {
-                        if (result.cod.toString() == Constants.NOT_FOUND) {
-                            showToast(result.message)
-                        }
-                        else {
-                            attributBinding(result)
-                            weatherState(result.weather[Constants.INDEXT_WEATHER].main.uppercase())
-                        }
-
+                        setUpCurrentWeather(getCurrentWeatherFromWeatherResponse(weatherResponse))
                     }
                 }
             }
         })
     }
-
-    private fun attributBinding(result:WeatherMain){
-        binding.apply {
-            cityName.text = "${result.name},${result.sys.country}"
-            temp.text = "${result.main.temp.toCelsius()}°"
-            description.text = result.weather[Constants.INDEXT_WEATHER].description
-            maxMin.text = "${result.main.tempMax.toCelsius()}° Max - ${result.main.tempMin.toCelsius()}° Min"
-            valueWind.text = "${result.wind.speed} km/h"
-            valueClouds.text = "${result.clouds.all.toPercent()}%"
-            valueHumidity.text = "${result.main.humidity.toPercent()}%"
-            valuePressure.text = "${result.main.pressure.toPercent()}%"
-        }
-    }
-
-    private fun weatherState(weatherState:String){
-        when (weatherState) {
-            WeatherState.CLOUDS.toString() -> {
-                binding.weather.setAnimation(R.raw.cloudy)
-                binding.weather.playAnimation()
-            }
-            WeatherState.CLEAR.toString() -> {
-                binding.weather.setAnimation(R.raw.sunny)
-                binding.weather.playAnimation()
-            }
-            WeatherState.RAIN.toString() -> {
-                binding.weather.setAnimation(R.raw.rain)
-                binding.weather.playAnimation()
-            }
-        }
-    }
-
 }
