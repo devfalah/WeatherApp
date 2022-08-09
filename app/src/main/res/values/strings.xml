@@ -3,4 +3,6 @@
     <string name="city_name">city name</string>
     <string name="name_city">Baghdad ,IQ</string>
     <string name="temp_value">00.00 C</string>
+    <string name="error_text">error, please try again.</string>
+    <string name="image_alt_content">image alt content</string>
 </resources>
